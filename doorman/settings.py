@@ -40,6 +40,7 @@ class Config(object):
     DOORMAN_MINIMUM_OSQUERY_LOG_LEVEL = 0
 
     DOORMAN_ENROLL_DEFAULT_TAGS = [
+      'base'
     ]
 
     DOORMAN_CAPTURE_NODE_INFO = [
@@ -78,7 +79,7 @@ class Config(object):
     # be called for every status or result log that is received, and can
     # do what they wish with them.
     DOORMAN_LOG_PLUGINS = [
-        # 'doorman.plugins.logs.file.LogPlugin',
+        'doorman.plugins.logs.file.LogPlugin',
         # 'doorman.plugins.logs.logstash.LogstashPlugin',
     ]
 
@@ -110,31 +111,31 @@ class Config(object):
         #     'key_format': 'doorman-security-{count}',
         # }),
 
-        # 'email': ('doorman.plugins.alerters.emailer.EmailAlerter', {
-        #     # Required
-        #     'recipients': [
-        #         # 'security@example.com',
-        #     ],
+         'email': ('doorman.plugins.alerters.emailer.EmailAlerter', {
+             # Required
+             'recipients': [
+               os.environ.get('MAIL_RECIPIENTS')
+             ],
 
-        #     # Optional, see doorman/plugins/alerters/emailer.py for templates
-        #     'subject_prefix': '[Doorman]',
-        #     'subject_template': '',
-        #     'message_template': '',
+             # Optional, see doorman/plugins/alerters/emailer.py for templates
+             #'subject_prefix': '[Doorman]',
+             #'subject_template': '',
+             #'message_template': '',
 
-        # }),
+         }),
 
         # 'sentry': ('doorman.plugins.alerters.sentry.SentryAlerter', {
         #     'dsn': 'https://<key>:<secret>@app.getsentry.com/<project>',
         # })
     }
 
-    # MAIL_SERVER = 'localhost'
-    # MAIL_PORT = 25
-    # MAIL_USE_TLS = False
-    # MAIL_USE_SSL = False
-    # MAIL_USERNAME = None
-    # MAIL_PASSWORD = None
-    MAIL_DEFAULT_SENDER = 'doorman@localhost'
+    MAIL_SERVER = os.environ.get('MAIL_SERVER')
+    MAIL_PORT = os.environ.get('MAIL_PORT')
+    MAIL_USE_TLS = True
+    MAIL_USE_SSL = False
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
 
     # Doorman uses the WatchedFileHandler in logging.handlers module.
     # It is the responsibility of the system to rotate these logs on
@@ -220,11 +221,6 @@ class ProdConfig(Config):
 
     ENFORCE_SSL = True
 
-    SQLALCHEMY_DATABASE_URI = ''
-
-    DOORMAN_ENROLL_SECRET = [
-
-    ]
     DOORMAN_MINIMUM_OSQUERY_LOG_LEVEL = 1
 
     BROKER_URL = ''
@@ -241,8 +237,6 @@ class DevConfig(Config):
     DEBUG_TB_ENABLED = True
     DEBUG_TB_INTERCEPT_REDIRECTS = False
     ASSETS_DEBUG = True
-
-    SQLALCHEMY_DATABASE_URI = 'postgresql://localhost:5432/doorman'
 
     DOORMAN_ENROLL_SECRET = [
         'secret',
@@ -271,68 +265,11 @@ class TestConfig(Config):
 
     DOORMAN_AUTH_METHOD = None
 
-
-if os.environ.get('DYNO'):
-    # we don't want to even define this class elsewhere,
-    # because its definition depends on Heroku-specific environment variables
-    class HerokuConfig(ProdConfig):
-        """
-        Environment variables accessed here are provided by Heroku.
-        REDIS_URL and DATABASE_URL are defined by addons,
-        while others should be created using `heroku config`.
-        They are also declared in `app.json`, so they will be created
-        when deploying using `Deploy to Heroku` button.
-        """
-        ENV = 'heroku'
-
-        DOORMAN_LOGGING_FILENAME = '-'  # handled specially - stdout
-
-        SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URL']
-        BROKER_URL = os.environ['REDIS_URL']
-        CELERY_RESULT_BACKEND = os.environ['REDIS_URL']
-
-        try:
-            SECRET_KEY = os.environ['SECRET_KEY']
-        except KeyError:
-            pass  # leave default random-filled key
-        # several values can be specified as a space-separated string
-        DOORMAN_ENROLL_SECRET = os.environ['ENROLL_SECRET'].split()
-
-        DOORMAN_AUTH_METHOD = "google" if os.environ.get('OAUTH_CLIENT_ID') else None
-        DOORMAN_OAUTH_CLIENT_ID = os.environ.get('OAUTH_CLIENT_ID')
-        DOORMAN_OAUTH_CLIENT_SECRET = os.environ.get('OAUTH_CLIENT_SECRET')
-        DOORMAN_OAUTH_GOOGLE_ALLOWED_USERS = os.environ.get('OAUTH_ALLOWED_USERS', '').split()
-
-        # mail config
-        MAIL_SERVER = os.environ.get('MAIL_SERVER')
-        MAIL_PORT = os.environ.get('MAIL_PORT')
-        MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
-        MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
-        MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
-        MAIL_USE_SSL = True
-
-        DOORMAN_ALERTER_PLUGINS = {
-            'debug': ('doorman.plugins.alerters.debug.DebugAlerter', {
-                'level': 'error',
-            }),
-
-            'email': ('doorman.plugins.alerters.emailer.EmailAlerter', {
-                'recipients': [
-                    email.strip() for email in
-                    os.environ.get('MAIL_RECIPIENTS', '').split(';')
-                ],
-            }),
-
-        }
-
-
 # choose proper configuration based on environment -
 # this is both for manage.py and for worker.py
 if os.environ.get('DOORMAN_ENV') == 'prod':
     CurrentConfig = ProdConfig
 elif os.environ.get('DOORMAN_ENV') == 'test':
     CurrentConfig = TestConfig
-elif os.environ.get('DYNO'):
-    CurrentConfig = HerokuConfig
 else:
     CurrentConfig = DevConfig

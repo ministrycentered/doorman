@@ -2,8 +2,33 @@
 
 cd /src/
 
-export DOORMAN_ENV=prod
+if [ -z $DOORMAN_ENV ]; then
+  export DOORMAN_ENV=prod
+fi
 export DOORMAN_SETTINGS=$PWD/settings.cfg
+
+if [ $DOORMAN_ENV == 'prod' ]; then
+  aws s3 cp s3://$DOORMAN_S3_BUCKET/certificate.crt . > /dev/null
+  aws s3 cp s3://$DOORMAN_S3_BUCKET/private.key . > /dev/null
+
+  if [ ! -f certificate.crt ]; then
+    echo "Warning: certificate not found"
+  fi
+  if [ ! -f private.key ]; then
+    echo "Warning: private key not found"
+  fi
+fi
+
+if [ -z $POSTGRES_PASSWORD ]; then
+  aws s3 cp s3://$DOORMAN_S3_BUCKET/postgres-password . > /dev/null
+  if [ ! -f postgres-password ]; then
+    echo "Warning: password not found"
+    exit 0
+  fi
+  POSTGRES_PASSWORD=`cat postgres-password`
+  rm postgres-password
+fi
+sed -i "s/POSTGRESPASSWORD/${POSTGRES_PASSWORD}/" $PWD/settings.cfg
 
 exec chpst \
   -u doorman \
@@ -11,4 +36,6 @@ exec chpst \
   gunicorn \
     --workers 4 \
     --bind 0.0.0.0:5000 \
-    manage:app
+    manage:app \
+    --certfile=certificate.crt \
+    --keyfile=private.key

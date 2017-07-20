@@ -9,13 +9,14 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repos
               libffi-dev \
               musl \
               nodejs \
+              nodejs-npm \
               postgresql-dev \
               py2-pip \
               python \
               python-dev \
               redis \
               runit \
-  && pip install --upgrade pip \
+  && pip install --upgrade pip awscli\
   && npm install -g bower less \
   && rm /var/cache/apk/*
 
@@ -51,6 +52,7 @@ RUN cd /src/ \
   && bower install --allow-root \
   && python manage.py assets build \
   && mkdir /var/log/doorman/ \
+  && chown doorman:doorman -R . \
   && chown doorman:doorman /var/log/doorman/
 
 CMD ["runsvdir", "/etc/service"]
